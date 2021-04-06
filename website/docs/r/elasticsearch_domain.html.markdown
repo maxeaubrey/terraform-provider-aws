@@ -226,6 +226,7 @@ The following arguments are supported:
 * `cognito_options` - (Optional) Options for authenticating Kibana with Cognito. See below.
 * `elasticsearch_version` - (Optional) The version of Elasticsearch to deploy. Defaults to `1.5`
 * `domain_endpoint_options` - (Optional) Domain endpoint HTTP(S) related options. See below.
+* `auto_tune_options` - (Optional) Auto tuning options. See below.
 * `tags` - (Optional) A map of tags to assign to the resource
 
 The **advanced_security_options** block supports the following attributes:
@@ -310,6 +311,17 @@ AWS documentation: [Amazon Cognito Authentication for Kibana](https://docs.aws.a
 * `user_pool_id` - (Required) ID of the Cognito User Pool to use
 * `identity_pool_id` - (Required) ID of the Cognito Identity Pool to use
 * `role_arn` - (Required) ARN of the IAM role that has the AmazonESCognitoAccess policy attached
+
+**auto_tune_options** supports the following attributes:
+
+* `desired_state` - (Optional, Default: ENABLED) Specifies whether auto tuning of the Elasticsearch domain is enabled. Accepts `ENABLED` or `DISABLED`.
+* `rollback_on_disable` - (Optional) Behaviour to use when disabling auto tuning. Accepts `NO_ROLLBACK` or `DEFAULT_ROLLBACK`.
+* `maintenance_schedule` - (Optional) Specifies windows during which A/B deployments can happen
+    * `start_at` - (Required) Date from which the schedule applies in RFC3339 format. Must be in the future.
+    * `duration` - (Required) Duration of maintanence window.
+        * `unit` - (Optional, Default: HOURS) Time unit to use. Only supports `HOURS`.
+        * `value` - (Required) A value between 1 and 23.
+    * `cron_expression_for_recurrence` - (Required) Cron expression for scheduling. See [cron expression formatting](https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/auto-tune.html#auto-tune-cron) in AWS documentation.
 
 ## Attributes Reference
 

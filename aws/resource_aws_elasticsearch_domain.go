@@ -433,6 +433,71 @@ func resourceAwsElasticSearchDomain() *schema.Resource {
 					},
 				},
 			},
+			"auto_tune_options": {
+				Type:     schema.TypeList,
+				Optional: true,
+				ForceNew: false,
+				MaxItems: 1,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"desired_state": {
+							Type:     schema.TypeString,
+							Optional: true,
+							ValidateFunc: validation.StringInSlice([]string{
+								elasticsearch.AutoTuneDesiredStateEnabled,
+								elasticsearch.AutoTuneDesiredStateDisabled,
+							}, false),
+						},
+						"rollback_on_disable": {
+							Type:     schema.TypeString,
+							Optional: true,
+							ValidateFunc: validation.StringInSlice([]string{
+								elasticsearch.RollbackOnDisableNoRollback,
+								elasticsearch.RollbackOnDisableDefaultRollback,
+							}, false),
+						},
+						"maintenance_schedule": {
+							Type:     schema.TypeList,
+							Optional: true,
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"start_at": {
+										Type:         schema.TypeString,
+										Required:     true,
+										ValidateFunc: validation.IsRFC3339Time,
+									},
+									"duration": {
+										Type:     schema.TypeList,
+										Optional: true,
+										MaxItems: 1,
+										Elem: &schema.Resource{
+											Schema: map[string]*schema.Schema{
+												"value": {
+													Type:         schema.TypeInt,
+													Required:     true,
+													ValidateFunc: validation.IntBetween(1, 23),
+												},
+												"unit": {
+													Type:     schema.TypeString,
+													Optional: true,
+													Default:  elasticsearch.TimeUnitHours,
+													ValidateFunc: validation.StringInSlice([]string{
+														elasticsearch.TimeUnitHours,
+													}, false),
+												},
+											},
+										},
+									},
+									"cron_expression_for_recurrence": {
+										Type:     schema.TypeString,
+										Required: true,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 
 			"tags": tagsSchema(),
 		},
@@ -563,6 +628,10 @@ func resourceAwsElasticSearchDomainCreate(d *schema.ResourceData, meta interface
 
 	if v, ok := d.GetOk("cognito_options"); ok {
 		input.CognitoOptions = expandESCognitoOptions(v.([]interface{}))
+	}
+
+	if v, ok := d.GetOk("auto_tune_options"); ok {
+		input.AutoTuneOptions = expandESAutoTuneOptionsInput(v.([]interface{}))
 	}
 
 	log.Printf("[DEBUG] Creating ElasticSearch domain: %s", input)
@@ -719,6 +788,10 @@ func resourceAwsElasticSearchDomainRead(d *schema.ResourceData, meta interface{}
 	if err != nil {
 		return err
 	}
+	err = d.Set("auto_tune_options", flattenESAutoTuneOptions(ds.AutoTuneOptions))
+	if err != nil {
+		return err
+	}
 	err = d.Set("node_to_node_encryption", flattenESNodeToNodeEncryptionOptions(ds.NodeToNodeEncryptionOptions))
 	if err != nil {
 		return err
@@ -869,6 +942,11 @@ func resourceAwsElasticSearchDomainUpdate(d *schema.ResourceData, meta interface
 		options := d.Get("vpc_options").([]interface{})
 		s := options[0].(map[string]interface{})
 		input.VPCOptions = expandESVPCOptions(s)
+	}
+
+	if d.HasChange("auto_tune_options") {
+		options := d.Get("auto_tune_options").([]interface{})
+		input.AutoTuneOptions = expandESAutoTuneOptions(options)
 	}
 
 	if d.HasChange("cognito_options") {

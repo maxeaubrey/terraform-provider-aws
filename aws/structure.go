@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/private/protocol/json/jsonutil"
@@ -1298,6 +1299,114 @@ func expandTxtEntry(s string) string {
 	}
 	return s
 }
+
+func expandESAutoTuneOptions(c []interface{}) *elasticsearch.AutoTuneOptions {
+	options := &elasticsearch.AutoTuneOptions{
+		DesiredState: aws.String(elasticsearch.AutoTuneDesiredStateEnabled),
+	}
+	if len(c) < 1 {
+		return options
+	}
+
+	m := c[0].(map[string]interface{})
+
+	if autoTuneDesiredState, ok := m["desired_state"]; ok {
+		options.DesiredState = aws.String(autoTuneDesiredState.(string))
+
+		if autoTuneDesiredState == elasticsearch.AutoTuneDesiredStateEnabled {
+			if maintenanceSchedules, ok := m["maintenance_schedule"].([]interface{}); ok {
+				if len(maintenanceSchedules) > 0 {
+					options.MaintenanceSchedules = getESAutoTuneMaintenanceSchedules(maintenanceSchedules)
+				}
+			}
+		} else {
+			if v, ok := m["rollback_on_disable"]; ok && v.(string) != "" {
+				options.RollbackOnDisable = aws.String(v.(string))
+			}
+		}
+	}
+
+	return options
+}
+
+func expandESAutoTuneOptionsInput(c []interface{}) *elasticsearch.AutoTuneOptionsInput {
+	options := &elasticsearch.AutoTuneOptionsInput{
+		DesiredState: aws.String(elasticsearch.AutoTuneDesiredStateEnabled),
+	}
+	if len(c) < 1 {
+		return options
+	}
+
+	m := c[0].(map[string]interface{})
+
+	if autoTuneDesiredState, ok := m["desired_state"]; ok {
+		options.DesiredState = aws.String(autoTuneDesiredState.(string))
+
+		if autoTuneDesiredState == elasticsearch.AutoTuneDesiredStateEnabled {
+			if maintenanceSchedules, ok := m["maintenance_schedule"].([]interface{}); ok {
+				if len(maintenanceSchedules) > 0 {
+					options.MaintenanceSchedules = getESAutoTuneMaintenanceSchedules(maintenanceSchedules)
+				}
+			}
+		}
+	}
+
+	return options
+}
+
+func getESAutoTuneMaintenanceSchedules(c []interface{}) []*elasticsearch.AutoTuneMaintenanceSchedule {
+	schedules := []*elasticsearch.AutoTuneMaintenanceSchedule{}
+
+	for k := range c {
+		v := c[k].(map[string]interface{})
+		schedule := &elasticsearch.AutoTuneMaintenanceSchedule{
+			CronExpressionForRecurrence: aws.String(v["cron_expression_for_recurrence"].(string)),
+		}
+
+		if s, ok := v["start_at"].(string); ok && s != "" {
+			start, _ := time.Parse(time.RFC3339, s)
+			schedule.StartAt = aws.Time(start)
+		}
+
+		if d, ok := v["duration"].([]interface{}); ok {
+			if len(d) > 0 && d[0] != nil {
+				duration := d[0].(map[string]interface{})
+				schedule.Duration = &elasticsearch.Duration{
+					Unit: aws.String(elasticsearch.TimeUnitHours),
+				}
+
+				if v, ok := duration["unit"].(string); ok && v != "" {
+					schedule.Duration.Unit = aws.String(v)
+				}
+
+				if v, ok := duration["value"].(int); ok {
+					schedule.Duration.Value = aws.Int64(int64(v))
+				}
+			}
+		}
+
+		schedules = append(schedules, schedule)
+	}
+
+	return schedules
+}
+
+func flattenESAutoTuneOptions(c *elasticsearch.AutoTuneOptionsOutput) []map[string]interface{} {
+	m := map[string]interface{}{}
+
+	// Sets desired state to enabled on either of enablement states, otherwise
+	// sets it to disabled
+	if *c.State == elasticsearch.AutoTuneStateEnabled || *c.State == elasticsearch.AutoTuneStateEnableInProgress {
+		m["desired_state"] = elasticsearch.AutoTuneDesiredStateEnabled
+	} else {
+		m["desired_state"] = elasticsearch.AutoTuneDesiredStateDisabled
+	}
+
+	// The SDK does not return any other information on e.g. maintenance schedules
+
+	return []map[string]interface{}{m}
+}
+
 func expandESCognitoOptions(c []interface{}) *elasticsearch.CognitoOptions {
 	options := &elasticsearch.CognitoOptions{
 		Enabled: aws.Bool(false),
